@@ -1,0 +1,10 @@
+{
+  "title": "Our Church",
+  "site": "https://dynamicgraphics.github.io/church-ar/viewer.html",
+  "signs": [
+    { "marker": 0, "label": "Sanctuary", "angle": 0, "color": "#1565c0" },
+    { "marker": 1, "label": "Restrooms", "angle": 270, "color": "#2e7d32" },
+    { "marker": 2, "label": "Nursery", "angle": 90, "color": "#ad1457" },
+    { "marker": 3, "label": "Fellowship Hall", "angle": 180, "color": "#ef6c00" }
+  ]
+}

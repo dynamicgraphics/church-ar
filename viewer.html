@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>AR Viewer &mdash; Church Wayfinder</title>
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#000;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .a-enter-vr, .a-enter-ar { display:none !important; }
+
+  /* Heads-up overlays drawn on top of the camera feed */
+  #hud { position:fixed; left:0; right:0; bottom:0; z-index:10; padding:16px;
+    text-align:center; pointer-events:none; }
+  #hint { display:inline-block; background:rgba(0,0,0,.55); color:#fff; padding:10px 16px;
+    border-radius:999px; font-size:15px; backdrop-filter:blur(4px); }
+  #dest { display:none; background:#1565c0; color:#fff; padding:12px 18px; border-radius:14px;
+    font-size:18px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+
+  #topbar { position:fixed; top:0; left:0; right:0; z-index:10; display:flex; justify-content:space-between;
+    align-items:center; padding:12px 14px; pointer-events:none; }
+  #title { background:rgba(0,0,0,.45); color:#fff; padding:6px 12px; border-radius:999px; font-size:14px; }
+  #back { pointer-events:auto; background:rgba(0,0,0,.45); color:#fff; text-decoration:none;
+    padding:6px 12px; border-radius:999px; font-size:14px; }
+
+  /* Start gate (camera must be requested from a user tap) */
+  #gate { position:fixed; inset:0; z-index:20; background:#0e1116; color:#fff; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:28px; }
+  #gate h1 { font-size:24px; margin:0 0 8px; }
+  #gate p { color:#aeb8c4; max-width:340px; margin:0 0 24px; line-height:1.5; }
+  #start { background:#1565c0; color:#fff; border:0; font-size:18px; font-weight:600;
+    padding:16px 34px; border-radius:14px; }
+  #gate small { color:#7c8794; margin-top:18px; max-width:320px; line-height:1.4; }
+  .err { color:#ff8a80 !important; }
+</style>
+</head>
+<body>
+  <div id="gate">
+    <h1 id="gateTitle">Church AR Wayfinder</h1>
+    <p id="gateMsg">Tap below, allow the camera, then point your phone at any wayfinding marker.</p>
+    <button id="start">Start camera</button>
+    <small id="gateNote"></small>
+  </div>
+
+  <div id="topbar">
+    <a id="back" href="index.html">&#8592; Menu</a>
+    <span id="title"></span>
+  </div>
+
+  <div id="hud">
+    <span id="hint">Point at a marker to see directions</span>
+    <span id="dest"></span>
+  </div>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
+  <script src="config.js"></script>
+  <script>
+  /* ---- Super Mario 64 styled geometry: chunky, beveled, low-poly toy look ---- */
+
+  // A fat extruded directional arrow (points toward +Y in its own 2D shape).
+  AFRAME.registerGeometry('mario-arrow', {
+    schema: { depth: { default: 0.22 } },
+    init: function (data) {
+      const s = new THREE.Shape();
+      s.moveTo(0, 1.0);        // tip
+      s.lineTo(-0.62, 0.28);   // left barb
+      s.lineTo(-0.26, 0.28);
+      s.lineTo(-0.26, -0.85);  // shaft left
+      s.lineTo(0.26, -0.85);   // shaft right
+      s.lineTo(0.26, 0.28);
+      s.lineTo(0.62, 0.28);    // right barb
+      s.closePath();
+      const geo = new THREE.ExtrudeGeometry(s, {
+        depth: data.depth, bevelEnabled: true,
+        bevelThickness: 0.08, bevelSize: 0.08, bevelSegments: 2, steps: 1
+      });
+      geo.center();
+      this.geometry = geo;
+    }
+  });
+
+  // The iconic 5-point Power Star.
+  AFRAME.registerGeometry('mario-star', {
+    schema: { points: { default: 5 }, inner: { default: 0.46 }, outer: { default: 1 }, depth: { default: 0.32 } },
+    init: function (data) {
+      const s = new THREE.Shape();
+      const step = Math.PI / data.points;
+      for (let i = 0; i < data.points * 2; i++) {
+        const r = (i % 2 === 0) ? data.outer : data.inner;
+        const a = i * step - Math.PI / 2;
+        const x = Math.cos(a) * r, y = Math.sin(a) * r;
+        i === 0 ? s.moveTo(x, y) : s.lineTo(x, y);
+      }
+      s.closePath();
+      const geo = new THREE.ExtrudeGeometry(s, {
+        depth: data.depth, bevelEnabled: true,
+        bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 1, steps: 1
+      });
+      geo.center();
+      this.geometry = geo;
+    }
+  });
+
+  (async function () {
+    const cfg = await ChurchAR.load();
+    document.getElementById('title').textContent = cfg.title;
+    document.getElementById('gateTitle').textContent = cfg.title;
+
+    if (!cfg.signs.length) {
+      document.getElementById('gateMsg').innerHTML =
+        'No signs are set up yet. Open the <b>Editor</b> to create some, then come back.';
+      document.getElementById('start').textContent = 'Open editor';
+      document.getElementById('start').onclick = () => location.href = 'editor.html';
+      return;
+    }
+
+    // If we arrived from a per-location QR (…?go=3), greet with that destination.
+    const goMarker = ChurchAR.param('go');
+    if (goMarker !== null) {
+      const s = cfg.signs.find(x => String(x.marker) === String(goMarker));
+      if (s && s.label) {
+        const safe = s.label.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+        document.getElementById('gateMsg').innerHTML =
+          'Directions to <b>' + safe + '</b>.<br>Tap below, allow the camera, then point at the marker.';
+        document.getElementById('start').textContent = 'Start directions';
+      }
+    }
+
+    const hint = document.getElementById('hint');
+    const dest = document.getElementById('dest');
+    const visible = new Set();
+
+    function refreshHud() {
+      if (visible.size) {
+        hint.style.display = 'none';
+        dest.style.display = 'inline-block';
+        dest.textContent = '➤ ' + [...visible].join('  •  ');
+      } else {
+        dest.style.display = 'none';
+        hint.style.display = 'inline-block';
+      }
+    }
+
+    // Build one arrow sign attached to a barcode marker.
+    function buildSign(sign) {
+      const marker = document.createElement('a-marker');
+      marker.setAttribute('type', 'barcode');
+      marker.setAttribute('value', String(sign.marker));
+      marker.setAttribute('smooth', 'true');
+      marker.setAttribute('smoothCount', '8');
+      marker.setAttribute('smoothTolerance', '0.01');
+
+      // The whole assembly bobs up and down like an SM64 collectible.
+      const lift = document.createElement('a-entity');
+      lift.setAttribute('position', '0 0.16 0');
+      lift.setAttribute('animation__bob',
+        'property: object3D.position.y; from: 0.12; to: 0.30; dir: alternate; loop: true; ' +
+        'dur: 820; easing: easeInOutSine');
+
+      // Aim group spins about the marker's vertical axis to point the chosen direction.
+      // Negated so it matches the editor's preview (0 = up, 90 = right, 270 = left).
+      const aim = document.createElement('a-entity');
+      aim.setAttribute('rotation', '0 ' + (-sign.angle) + ' 0');
+
+      // Lay the flat 2D arrow shape down on the marker so it points toward -Z at angle 0.
+      const flat = document.createElement('a-entity');
+      flat.setAttribute('rotation', '-90 0 0');
+      flat.setAttribute('scale', '0.42 0.42 0.42');
+
+      // Inverted-hull black copy = chunky cartoon outline.
+      const outline = document.createElement('a-entity');
+      outline.setAttribute('geometry', 'primitive: mario-arrow');
+      outline.setAttribute('material', 'shader: flat; color: #14110a; side: back');
+      outline.setAttribute('scale', '1.12 1.12 1.12');
+      flat.appendChild(outline);
+
+      // Bright, glossy arrow body in the sign's color.
+      const body = document.createElement('a-entity');
+      body.setAttribute('geometry', 'primitive: mario-arrow');
+      body.setAttribute('material',
+        'color: ' + sign.color + '; emissive: ' + sign.color +
+        '; emissiveIntensity: 0.30; metalness: 0.2; roughness: 0.45');
+      flat.appendChild(body);
+
+      aim.appendChild(flat);
+      lift.appendChild(aim);
+
+      // Spinning gold Power Star hovering above the arrow.
+      const star = document.createElement('a-entity');
+      star.setAttribute('position', '0 0.55 0');
+      star.setAttribute('scale', '0.17 0.17 0.17');
+      star.setAttribute('animation__spin',
+        'property: object3D.rotation.y; from: 0; to: 6.2832; loop: true; dur: 1500; easing: linear');
+      const starOutline = document.createElement('a-entity');
+      starOutline.setAttribute('geometry', 'primitive: mario-star');
+      starOutline.setAttribute('material', 'shader: flat; color: #3a2a00; side: back');
+      starOutline.setAttribute('scale', '1.14 1.14 1.14');
+      star.appendChild(starOutline);
+      const starBody = document.createElement('a-entity');
+      starBody.setAttribute('geometry', 'primitive: mario-star');
+      starBody.setAttribute('material',
+        'color: #ffd23f; emissive: #ffb300; emissiveIntensity: 0.45; metalness: 0.35; roughness: 0.35');
+      star.appendChild(starBody);
+      lift.appendChild(star);
+
+      marker.appendChild(lift);
+
+      // Destination shown on a wooden SM64-style signpost, laid flat, kept steady (no spin).
+      if (sign.label) {
+        const safe = sign.label.replace(/[;,]/g, ' ').slice(0, 40);
+        const w = Math.max(1.3, Math.min(4.2, safe.length * 0.18 + 0.6));
+        const panel = document.createElement('a-entity');
+        panel.setAttribute('rotation', '-90 0 0');
+        panel.setAttribute('position', '0 0.05 1.0');
+
+        const frame = document.createElement('a-plane');
+        frame.setAttribute('color', '#3f2d18');
+        frame.setAttribute('width', w + 0.16);
+        frame.setAttribute('height', '0.66');
+        frame.setAttribute('position', '0 0 -0.02');
+        panel.appendChild(frame);
+
+        const plank = document.createElement('a-plane');
+        plank.setAttribute('color', '#7a5230');
+        plank.setAttribute('width', w);
+        plank.setAttribute('height', '0.5');
+        panel.appendChild(plank);
+
+        const txt = document.createElement('a-entity');
+        txt.setAttribute('position', '0 0 0.01');
+        txt.setAttribute('text',
+          'value: ' + safe + '; align: center; color: #fff3d6; weight: bold; width: ' + (w * 1.7));
+        panel.appendChild(txt);
+
+        marker.appendChild(panel);
+      }
+
+      marker.addEventListener('markerFound', () => {
+        if (sign.label) { visible.add(sign.label); refreshHud(); }
+      });
+      marker.addEventListener('markerLost', () => {
+        if (sign.label) { visible.delete(sign.label); refreshHud(); }
+      });
+      return marker;
+    }
+
+    function launch() {
+      const gate = document.getElementById('gate');
+      const scene = document.createElement('a-scene');
+      scene.setAttribute('embedded', '');
+      scene.setAttribute('vr-mode-ui', 'enabled: false');
+      scene.setAttribute('renderer', 'antialias: true; logarithmicDepthBuffer: true');
+      scene.setAttribute('arjs',
+        'sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; ' +
+        'debugUIEnabled: false; trackingMethod: best;');
+
+      // Bright, even lighting so the chunky bevels and gold star pop.
+      const amb = document.createElement('a-entity');
+      amb.setAttribute('light', 'type: ambient; color: #fff; intensity: 0.9');
+      scene.appendChild(amb);
+      const dir = document.createElement('a-entity');
+      dir.setAttribute('light', 'type: directional; color: #fff; intensity: 0.7');
+      dir.setAttribute('position', '1 2 1');
+      scene.appendChild(dir);
+
+      cfg.signs.forEach(s => scene.appendChild(buildSign(s)));
+
+      const cam = document.createElement('a-entity');
+      cam.setAttribute('camera', '');
+      scene.appendChild(cam);
+
+      document.body.appendChild(scene);
+
+      // Hide the gate once the camera video is actually flowing.
+      const done = () => { gate.style.display = 'none'; };
+      scene.addEventListener('arjs-video-loaded', done);
+      setTimeout(done, 4000); // fallback in case the event name varies by version
+    }
+
+    const startBtn = document.getElementById('start');
+    startBtn.onclick = () => {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Starting…';
+      try { launch(); }
+      catch (e) {
+        document.getElementById('gateNote').className = 'err';
+        document.getElementById('gateNote').textContent = 'Could not start AR: ' + e.message;
+        startBtn.disabled = false;
+        startBtn.textContent = 'Try again';
+      }
+    };
+
+    // Friendly note if not served over HTTPS (camera will be blocked).
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      document.getElementById('gateNote').className = 'err';
+      document.getElementById('gateNote').textContent =
+        'Heads up: the camera only works on an https:// address (or localhost).';
+    }
+  })();
+  </script>
+</body>
+</html>
