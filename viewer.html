@@ -206,35 +206,8 @@
 
       marker.appendChild(lift);
 
-      // Destination shown on a wooden SM64-style signpost, laid flat, kept steady (no spin).
-      if (sign.label) {
-        const safe = sign.label.replace(/[;,]/g, ' ').slice(0, 40);
-        const w = Math.max(1.3, Math.min(4.2, safe.length * 0.18 + 0.6));
-        const panel = document.createElement('a-entity');
-        panel.setAttribute('rotation', '-90 0 0');
-        panel.setAttribute('position', '0 0.05 1.0');
-
-        const frame = document.createElement('a-plane');
-        frame.setAttribute('color', '#3f2d18');
-        frame.setAttribute('width', w + 0.16);
-        frame.setAttribute('height', '0.66');
-        frame.setAttribute('position', '0 0 -0.02');
-        panel.appendChild(frame);
-
-        const plank = document.createElement('a-plane');
-        plank.setAttribute('color', '#7a5230');
-        plank.setAttribute('width', w);
-        plank.setAttribute('height', '0.5');
-        panel.appendChild(plank);
-
-        const txt = document.createElement('a-entity');
-        txt.setAttribute('position', '0 0 0.01');
-        txt.setAttribute('text',
-          'value: ' + safe + '; align: center; color: #fff3d6; weight: bold; width: ' + (w * 1.7));
-        panel.appendChild(txt);
-
-        marker.appendChild(panel);
-      }
+      // No floating signpost over the marker — just the arrow + orientation star.
+      // The destination name still appears in the on-screen banner (see markerFound below).
 
       marker.addEventListener('markerFound', () => {
         if (sign.label) { visible.add(sign.label); refreshHud(); }
