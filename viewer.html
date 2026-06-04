@@ -5,9 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>AR Viewer &mdash; Church Wayfinder</title>
 <style>
-  html,body { margin:0; height:100%; overflow:hidden; background:#000;
+  html,body { margin:0; height:100%; overflow:hidden; background:transparent;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
   .a-enter-vr, .a-enter-ar { display:none !important; }
+
+  /* Camera feed fills the screen and sits behind the transparent 3D canvas */
+  #arjs-video, video.arjs-video {
+    position:fixed; top:0; left:0; width:100vw; height:100vh; object-fit:cover; z-index:-1; }
+  .a-canvas { background:transparent !important; }
 
   /* Heads-up overlays drawn on top of the camera feed */
   #hud { position:fixed; left:0; right:0; bottom:0; z-index:10; padding:16px;
@@ -99,6 +104,25 @@
       });
       geo.center();
       this.geometry = geo;
+    }
+  });
+
+  /* Force the WebGL canvas to clear transparently so the live camera shows
+     through behind the arrow (otherwise AR.js can paint a solid black screen). */
+  AFRAME.registerComponent('ar-transparent', {
+    init: function () {
+      const scene = this.el;
+      const apply = () => {
+        const r = scene.renderer;
+        if (!r) return;
+        r.setClearColor(0x000000, 0);
+        r.setClearAlpha(0);
+        if (scene.object3D) scene.object3D.background = null;
+        if (scene.canvas) scene.canvas.style.backgroundColor = 'transparent';
+      };
+      if (scene.renderer) apply();
+      scene.addEventListener('render-target-loaded', apply);
+      scene.addEventListener('renderstart', apply);
     }
   });
 
@@ -222,8 +246,9 @@
       const gate = document.getElementById('gate');
       const scene = document.createElement('a-scene');
       scene.setAttribute('embedded', '');
+      scene.setAttribute('ar-transparent', '');
       scene.setAttribute('vr-mode-ui', 'enabled: false');
-      scene.setAttribute('renderer', 'antialias: true; logarithmicDepthBuffer: true');
+      scene.setAttribute('renderer', 'antialias: true; alpha: true; logarithmicDepthBuffer: true');
       scene.setAttribute('arjs',
         'sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; ' +
         'debugUIEnabled: false; trackingMethod: best;');
