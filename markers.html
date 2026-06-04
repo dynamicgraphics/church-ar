@@ -25,8 +25,13 @@
     display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
   .marker { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; text-align:center;
     break-inside:avoid; }
-  .marker .img { background:#fff; border:1px solid #000; padding:14px; display:inline-block; }
-  .marker img { width:100%; max-width:260px; image-rendering:pixelated; display:block; }
+  /* Colored star badge with the scannable code in its white center */
+  .marker .starwrap { position:relative; width:100%; max-width:300px; aspect-ratio:1/1; margin:0 auto;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .marker .starwrap .star { width:100%; height:100%; display:block; }
+  .marker .starwrap .patt { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:48%; background:#fff; padding:8%; border-radius:3px; }
+  .marker .starwrap .patt img { width:100%; display:block; image-rendering:pixelated; }
   .marker .num { font-size:13px; color:var(--muted); margin-top:10px; letter-spacing:.5px; }
   .marker .label { font-size:20px; font-weight:700; margin-top:2px; min-height:24px; }
   .marker .cap { font-size:11px; color:var(--muted); margin-top:6px; }
@@ -53,7 +58,7 @@
 </head>
 <body>
 <header>
-  <a href="index.html">&#8592; Menu</a>
+  <a href="menu.html">&#8592; Menu</a>
   <h1>Print the Markers</h1>
 </header>
 
@@ -63,10 +68,10 @@
   <span id="count" style="color:#5b6876;font-size:14px;"></span>
 </div>
 <div class="note">
-  Print at <b>100% scale</b> (no "fit to page"). Mount each marker flat where its arrow should appear &mdash;
-  on a wall at eye level works well. Bigger markers scan from farther away. Keep the white border around the
-  black square clear; don't laminate with a glossy finish that causes glare. Each printed marker is tied to its
-  number in the Editor.
+  Print at <b>100% scale</b> (no "fit to page"). Each marker is a colored star matching its arrow, with the
+  scannable code in the white center. Mount each star flat where its arrow should appear &mdash; on a wall at
+  eye level works well. Bigger stars scan from farther away. Keep the <b>white center</b> clean and uncovered,
+  and don't laminate with a glossy finish that causes glare. Each star is tied to its number in the Editor.
 </div>
 
 <div class="sheet" id="sheet"></div>
@@ -84,15 +89,26 @@ function qrTag(url, cell){
   catch(e){ return ''; }
 }
 
-function card(n, label){
+// A 5-point star filled with the sign's color.
+function starSVG(color){
+  return `<svg class="star" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+    <polygon points="50,3 63,37 99,38 70,60 81,96 50,74 19,96 30,60 1,38 37,37"
+      fill="${color}" stroke="rgba(0,0,0,0.18)" stroke-width="1.2"
+      stroke-linejoin="round"/></svg>`;
+}
+
+function card(n, label, color){
   const url = ChurchAR.viewerUrl(cfg, { go: n, embed: true });
   const d = document.createElement('div');
   d.className = 'marker';
   d.innerHTML = `
-    <div class="img"><img src="${SRC(n)}" alt="Marker ${n}" loading="lazy"></div>
+    <div class="starwrap">
+      ${starSVG(color)}
+      <div class="patt"><img src="${SRC(n)}" alt="Marker ${n}" loading="lazy"></div>
+    </div>
     <div class="num">MARKER ${n}</div>
     <div class="label">${(label||'—').replace(/</g,'&lt;')}</div>
-    <div class="qr">${qrTag(url, 3)}<span>Scan to open directions,<br>then point at the square above</span></div>`;
+    <div class="qr">${qrTag(url, 3)}<span>Scan to open directions,<br>then point at the star above</span></div>`;
   return d;
 }
 
@@ -121,7 +137,7 @@ function draw(){
   if (showAll) {
     for (let n=0;n<=63;n++){
       const s = cfg.signs.find(x => x.marker===n);
-      sheet.appendChild(card(n, s ? s.label : ''));
+      sheet.appendChild(card(n, s ? s.label : '', s ? s.color : '#9aa7b4'));
     }
     document.getElementById('count').textContent = 'All 64 markers';
   } else {
@@ -132,7 +148,7 @@ function draw(){
       p.textContent = 'No signs yet — add some in the Editor first, or tick “Show all 64 markers”.';
       sheet.appendChild(p);
     } else {
-      signs.forEach(s => sheet.appendChild(card(s.marker, s.label)));
+      signs.forEach(s => sheet.appendChild(card(s.marker, s.label, s.color)));
     }
     document.getElementById('count').textContent = signs.length + ' marker' + (signs.length===1?'':'s') + ' in use';
   }

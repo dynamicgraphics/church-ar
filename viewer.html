@@ -48,7 +48,7 @@
   </div>
 
   <div id="topbar">
-    <a id="back" href="index.html">&#8592; Menu</a>
+    <a id="back" href="menu.html">&#8592; Menu</a>
     <span id="title"></span>
   </div>
 
@@ -210,27 +210,9 @@
       aim.appendChild(flat);
       lift.appendChild(aim);
 
-      // Spinning gold Power Star hovering above the arrow.
-      const star = document.createElement('a-entity');
-      star.setAttribute('position', '0 0.55 0');
-      star.setAttribute('scale', '0.17 0.17 0.17');
-      star.setAttribute('animation__spin',
-        'property: object3D.rotation.y; from: 0; to: 6.2832; loop: true; dur: 1500; easing: linear');
-      const starOutline = document.createElement('a-entity');
-      starOutline.setAttribute('geometry', 'primitive: mario-star');
-      starOutline.setAttribute('material', 'shader: flat; color: #3a2a00; side: back');
-      starOutline.setAttribute('scale', '1.14 1.14 1.14');
-      star.appendChild(starOutline);
-      const starBody = document.createElement('a-entity');
-      starBody.setAttribute('geometry', 'primitive: mario-star');
-      starBody.setAttribute('material',
-        'color: #ffd23f; emissive: #ffb300; emissiveIntensity: 0.45; metalness: 0.35; roughness: 0.35');
-      star.appendChild(starBody);
-      lift.appendChild(star);
-
       marker.appendChild(lift);
 
-      // No floating signpost over the marker — just the arrow + orientation star.
+      // No floating star or signpost over the marker — just the arrow.
       // The destination name still appears in the on-screen banner (see markerFound below).
 
       marker.addEventListener('markerFound', () => {

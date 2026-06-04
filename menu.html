@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Church AR Wayfinder &mdash; Menu</title>
+<style>
+  :root { --brand:#1565c0; --ink:#1c2530; --muted:#5b6876; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         color:var(--ink); background:#f4f6f8; -webkit-text-size-adjust:100%; }
+  header { background:var(--brand); color:#fff; padding:28px 20px; text-align:center; }
+  header h1 { margin:0 0 6px; font-size:22px; }
+  header p { margin:0; opacity:.9; font-size:14px; }
+  main { max-width:560px; margin:0 auto; padding:20px; }
+  .card { display:block; background:#fff; border:1px solid #e2e8ee; border-radius:14px;
+          padding:18px 18px; margin:14px 0; text-decoration:none; color:inherit;
+          box-shadow:0 1px 2px rgba(20,40,80,.05); }
+  .card:active { transform:scale(.99); }
+  .card h2 { margin:0 0 4px; font-size:18px; }
+  .card p { margin:0; color:var(--muted); font-size:14px; }
+  .icon { font-size:26px; }
+  .row { display:flex; gap:14px; align-items:center; }
+  .note { background:#eef4ff; border:1px solid #cfe0ff; color:#27406b; border-radius:10px;
+          padding:10px 12px; font-size:13px; line-height:1.45; margin:4px 0 14px; }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Church AR Wayfinder</h1>
+  <p>Staff menu</p>
+</header>
+<main>
+  <div class="note">
+    Visitors should open the plain link &mdash; it goes straight to the camera.
+    This menu is for setting things up.
+  </div>
+  <a class="card row" href="viewer.html">
+    <div class="icon">&#128247;</div>
+    <div><h2>Open the AR Viewer</h2><p>The visitor experience. Allow the camera, then point at a marker.</p></div>
+  </a>
+  <a class="card row" href="editor.html">
+    <div class="icon">&#9999;&#65039;</div>
+    <div><h2>Edit the Signs</h2><p>Assign a destination &amp; arrow direction to each marker number.</p></div>
+  </a>
+  <a class="card row" href="markers.html">
+    <div class="icon">&#11088;</div>
+    <div><h2>Print the Markers</h2><p>Printable color star markers + QR codes to place around the building.</p></div>
+  </a>
+</main>
+<footer>Works in any modern phone browser. No app to install.</footer>
+</body>
+</html>
